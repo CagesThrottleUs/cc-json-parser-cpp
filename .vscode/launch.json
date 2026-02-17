@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "jsonFilePath",
+      "type": "promptString",
+      "description": "Path to JSON file (relative to workspace or absolute)"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Debug (Clang)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/out/build/clang-debug/cc-json-parser-cpp",
+      "args": ["${input:jsonFilePath}"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "cmake-build-debug",
+      "MIMode": "lldb"
+    },
+    {
+      "name": "Debug (Clang) — no build",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/out/build/clang-debug/cc-json-parser-cpp",
+      "args": ["${input:jsonFilePath}"],
+      "cwd": "${workspaceFolder}",
+      "MIMode": "lldb"
+    }
+  ]
+}

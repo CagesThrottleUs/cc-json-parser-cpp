@@ -1,0 +1,8 @@
+if(EXISTS "/opt/homebrew/opt/llvm/bin/clang++")
+  set(CMAKE_C_COMPILER "/opt/homebrew/opt/llvm/bin/clang")
+  set(CMAKE_CXX_COMPILER "/opt/homebrew/opt/llvm/bin/clang++")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem /opt/homebrew/opt/llvm/include/c++/v1")
+  message(STATUS "Using Homebrew LLVM: ${CMAKE_CXX_COMPILER}")
+else()
+  message(STATUS "Homebrew LLVM not found at /opt/homebrew/opt/llvm, using default compiler")
+endif()

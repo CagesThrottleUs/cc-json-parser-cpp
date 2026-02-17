@@ -1,0 +1,5 @@
+CompileFlags:
+  Add:
+    - -nostdinc++
+    - -isystem
+    - /opt/homebrew/opt/llvm/include/c++/v1
