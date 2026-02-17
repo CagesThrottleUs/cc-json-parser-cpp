@@ -1,5 +1,12 @@
 {
   "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "jsonFilePath",
+      "type": "promptString",
+      "description": "Path to JSON file (relative to workspace or absolute)"
+    }
+  ],
   "tasks": [
     {
       "label": "cmake-configure-release",
@@ -38,7 +45,7 @@
     {
       "label": "run",
       "type": "shell",
-      "command": "${workspaceFolder}/out/build/clang-release/cc-json-parser-cpp",
+      "command": "${workspaceFolder}/out/build/clang-release/cc-json-parser-cpp ${input:jsonFilePath}",
       "options": { "cwd": "${workspaceFolder}" },
       "group": "test",
       "dependsOn": "cmake-build",
