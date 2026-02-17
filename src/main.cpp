@@ -17,7 +17,6 @@ void handle_usage_error(const std::span<char*>& args);
 
 void run_trial(const std::string& filename);
 
-/** Encode one codepoint to UTF-8 for display. */
 auto codepoint_to_utf8(char32_t codepoint) -> std::string;
 
 }  // namespace

@@ -6,6 +6,9 @@
 
 namespace exceptions {
 
+/**
+ * Exception thrown when a file operation fails.
+ */
 class file_operation_exception : public std::exception {
  public:
   explicit file_operation_exception(std::string message)

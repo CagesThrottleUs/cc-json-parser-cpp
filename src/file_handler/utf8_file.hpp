@@ -30,14 +30,49 @@ class Utf8File {
   Utf8File() = default;
 
  public:
+  /**
+   * Returns the next codepoint from the file.
+   * @return The next codepoint, or std::nullopt if at end of file.
+   */
   virtual auto next_codepoint() -> std::optional<codepoint_type> = 0;
+
+  /**
+   * Returns the next codepoint from the file without advancing the file
+   * pointer.
+   * @return The next codepoint, or std::nullopt if at end of file.
+   */
   [[nodiscard]] virtual auto peek_codepoint() const
       -> std::optional<codepoint_type> = 0;
+
+  /**
+   * Advances the file pointer by one codepoint.
+   * @return True if successful, false if at end of file.
+   */
   virtual auto advance() -> bool = 0;
+
+  /**
+   * Resets the file pointer to the beginning of the file.
+   */
   virtual void reset() = 0;
+
+  /**
+   * Returns true if the file is in a good state.
+   */
   [[nodiscard]] virtual auto good() const -> bool = 0;
+
+  /**
+   * Returns the name of the file.
+   */
   [[nodiscard]] virtual auto name() const -> std::string = 0;
+
+  /**
+   * Returns the size of the file.
+   */
   [[nodiscard]] virtual auto size() const noexcept -> std::size_t = 0;
+
+  /**
+   * Returns true if the file pointer is at the end of the file.
+   */
   [[nodiscard]] virtual auto at_end() const noexcept -> bool = 0;
 };
 

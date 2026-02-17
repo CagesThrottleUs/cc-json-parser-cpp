@@ -17,6 +17,11 @@ namespace detail {
 
 namespace {
 
+/**
+ * Validates the file path.
+ * @throws exceptions::file_operation_exception if file does not exist or is not
+ * a regular file.
+ */
 void validate_file_path(const std::string& filename) {
   namespace fs = std::filesystem;
   std::error_code err_code;

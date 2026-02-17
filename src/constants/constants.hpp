@@ -15,8 +15,10 @@ enum class exit_codes : int {  // NOLINT(performance-enum-size)
 };
 
 /** How the file is backed: full buffer in memory or memory-mapped. */
-// NOLINTNEXTLINE(performance-enum-size)
-enum class file_load_type { FullMemory, MemoryMapped };
+enum class file_load_type {  // NOLINT(performance-enum-size)
+  FullMemory,
+  MemoryMapped
+};
 
 }  // namespace constants
 
