@@ -24,7 +24,16 @@ If your toolchain lives elsewhere, update both **`.clangd`** and **`cmake/Homebr
 
 ### `.clangd`
 
-- **CompileFlags.Add** — Uses a single C++ stdlib path to avoid "using declaration conflicts": `-nostdinc++` (skip default C++ stdlib path), then `-isystem` + path (e.g. `/opt/homebrew/opt/llvm/include/c++/v1`). If your stdlib is elsewhere, change only that path.
+Configures the clangd language server so the IDE matches the build. **CompileFlags.Add** includes:
+
+| Flag / purpose | Value (adjust if your paths differ) |
+|----------------|-------------------------------------|
+| C++ standard   | `-std=c++23` |
+| C++ stdlib     | `-nostdinc++` then `-isystem /opt/homebrew/opt/llvm/include/c++/v1` (avoids using-declaration conflicts; change the path if your LLVM stdlib is elsewhere) |
+| Project includes | `-I<project-root>/include` (add `-I<project-root>/src` if headers under `src/` do not resolve) |
+| Boost          | `-isystem /opt/homebrew/opt/boost/include` |
+
+After editing `.clangd`, restart clangd (**Cmd+Shift+P** → "clangd: Restart language server").
 
 ### `cmake/HomebrewLLVM.cmake`
 
