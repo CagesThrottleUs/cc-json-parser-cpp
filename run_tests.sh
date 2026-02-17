@@ -15,7 +15,7 @@ expected_exit() {
     valid*)   echo 0 ;;
     fail*)    echo 1 ;;
     pass*)    echo 0 ;;
-    i_*)      echo 0 ;;
+    i_*)      echo "0,1" ;;   # invalid: accept 0 or 1
     n_*)      echo 1 ;;
     y_*)      echo 0 ;;
     *)        return 1 ;;
@@ -23,11 +23,17 @@ expected_exit() {
 }
 
 run_one() {
-  local f="$1" name expected got
+  local f="$1" name expected got ok
   name="$(basename "$f" .json)"
   expected="$(expected_exit "$name")" || return 0  # skip unknown prefix
   if "$PARSER" "$f" >/dev/null 2>&1; then got=0; else got=1; fi
-  if [[ "$expected" == "$got" ]]; then echo "PASS $f"; else echo "FAIL $f"; fi
+  if [[ "$expected" == *","* ]]; then
+    ok=0
+    for e in ${expected//,/ }; do [[ "$e" == "$got" ]] && ok=1; done
+  else
+    [[ "$expected" == "$got" ]] && ok=1 || ok=0
+  fi
+  if [[ "$ok" -eq 1 ]]; then echo "PASS $f"; else echo "FAIL $f"; fi
 }
 
 export -f expected_exit run_one

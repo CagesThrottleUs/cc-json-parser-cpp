@@ -1,24 +1,29 @@
 #include <exception>
 #include <iostream>
-#include <memory>
+#include <optional>
 #include <span>
 #include <sstream>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "constants/constants.hpp"
 #include "exceptions/file_operation_exception.hpp"
+#include "exceptions/tokenization_exception.hpp"
 #include "exceptions/usage_exception.hpp"
 #include "file_handler/utf8_file.hpp"
-#include "utf8/checked.h"
+#include "tokenizer/tokenizer.hpp"
 
 namespace {
 
+constexpr std::size_t kTableSeparatorWidth = 60;
+
 void handle_usage_error(const std::span<char*>& args);
-
-void run_trial(const std::string& filename);
-
-/** Encode one codepoint to UTF-8 for display. */
-auto codepoint_to_utf8(char32_t codepoint) -> std::string;
+auto token_type_label(tokenizer::TokenType type) -> const char*;
+void print_tokens_table(const std::vector<tokenizer::Token>& tokens);
+void print_errors_table(const std::vector<std::string>& errors);
+auto tokenize_collecting_tokens_and_errors(tokenizer::Tokenizer& tok)
+    -> std::pair<std::vector<tokenizer::Token>, std::optional<std::string>>;
 
 }  // namespace
 
@@ -27,7 +32,15 @@ auto main(int argc, char** argv) -> int {
 
   try {
     handle_usage_error(args);
-    run_trial(args[1]);
+    const std::string filename(args[1]);
+    auto file = file_handler::open_utf8_file(filename);
+    tokenizer::Tokenizer tok(std::move(file));
+    auto [tokens, error] = tokenize_collecting_tokens_and_errors(tok);
+    print_tokens_table(tokens);
+    if (error) {
+      print_errors_table({*error});
+      return std::to_underlying(constants::exit_codes::INVALID_JSON);
+    }
     return std::to_underlying(constants::exit_codes::VALID_JSON);
   } catch (const exceptions::usage_exception& e) {
     std::cerr << e.what() << '\n';
@@ -35,8 +48,14 @@ auto main(int argc, char** argv) -> int {
   } catch (const exceptions::file_operation_exception& e) {
     std::cerr << e.what() << '\n';
     return std::to_underlying(constants::exit_codes::FILE_OPERATION_ERROR);
+  } catch (const exceptions::tokenization_exception& e) {
+    std::cerr << e.what() << '\n';
+    return std::to_underlying(constants::exit_codes::INVALID_JSON);
   } catch (const std::exception& e) {
     std::cerr << e.what() << '\n';
+    return std::to_underlying(constants::exit_codes::UNKNOWN_ERROR);
+  } catch (...) {
+    std::cerr << "Unknown exception occurred\n";
     return std::to_underlying(constants::exit_codes::UNKNOWN_ERROR);
   }
 }
@@ -56,51 +75,83 @@ void handle_usage_error(const std::span<char*>& args) {
   }
 }
 
-void run_trial(const std::string& filename) {
-  const constants::file_load_type load_type =
-      file_handler::get_file_load_type(filename);
-  const char* load_name = (load_type == constants::file_load_type::FullMemory)
-                              ? "FullMemory"
-                              : "MemoryMapped";
-
-  std::unique_ptr<file_handler::Utf8File> file =
-      file_handler::open_utf8_file(filename);
-
-  std::cout << "--- file ---\n";
-  std::cout << "  path:      " << filename << "\n";
-  std::cout << "  load type: " << load_name << "\n";
-  std::cout << "  size:      " << file->size() << " bytes\n\n";
-
-  std::cout << "--- first 20 codepoints (hex + character) ---\n  ";
-  std::string interpreted;
-  constexpr int max_codepoints = 20;
-  for (int count = 0; count < max_codepoints && !file->at_end(); ++count) {
-    auto codepoint = file->next_codepoint();
-    if (!codepoint) {
-      break;
-    }
-    std::cout << " U+" << std::hex << static_cast<unsigned>(*codepoint)
-              << std::dec << " '" << codepoint_to_utf8(*codepoint) << "'";
-    utf8::append(static_cast<utf8::utfchar32_t>(*codepoint),
-                 std::back_inserter(interpreted));
+auto token_type_label(tokenizer::TokenType type) -> const char* {
+  switch (type) {
+    case tokenizer::TK_STRING:
+      return "TK_STRING";
+    case tokenizer::TK_NUMBER:
+      return "TK_NUMBER";
+    case tokenizer::TK_TRUE:
+      return "TK_TRUE";
+    case tokenizer::TK_FALSE:
+      return "TK_FALSE";
+    case tokenizer::TK_NULL:
+      return "TK_NULL";
+    case tokenizer::TK_OPEN_BRACE:
+      return "TK_OPEN_BRACE";
+    case tokenizer::TK_CLOSE_BRACE:
+      return "TK_CLOSE_BRACE";
+    case tokenizer::TK_OPEN_BRACKET:
+      return "TK_OPEN_BRACKET";
+    case tokenizer::TK_CLOSE_BRACKET:
+      return "TK_CLOSE_BRACKET";
+    case tokenizer::TK_COLON:
+      return "TK_COLON";
+    case tokenizer::TK_COMMA:
+      return "TK_COMMA";
+    case tokenizer::END_OF_INPUT:
+      return "END_OF_INPUT";
+    default:
+      return "?";
   }
-  std::cout << "\n\n  interpreted: \"" << interpreted << "\"\n\n";
-
-  file->reset();
-  std::cout << "--- after reset ---\n";
-  if (const auto peeked = file->peek_codepoint()) {
-    std::cout << "  peek:  U+" << std::hex << static_cast<unsigned>(*peeked)
-              << std::dec << " '" << codepoint_to_utf8(*peeked) << "'\n";
-    file->advance();
-  }
-  std::cout << "  atEnd: " << (file->at_end() ? "yes" : "no") << "\n";
 }
 
-auto codepoint_to_utf8(char32_t codepoint) -> std::string {
-  std::string out;
-  utf8::append(static_cast<utf8::utfchar32_t>(codepoint),
-               std::back_inserter(out));
-  return out;
+void print_tokens_table(const std::vector<tokenizer::Token>& tokens) {
+  std::cout << "Tokens (" << tokens.size() << "):\n";
+  if (tokens.empty()) {
+    std::cout << "  (none)\n";
+    return;
+  }
+  const char* sep = " | ";
+  std::cout << "#" << sep << "Type" << sep << "Lexeme" << sep << "Line"
+            << sep << "Column\n";
+  std::cout << std::string(kTableSeparatorWidth, '-') << '\n';
+  for (std::size_t i = 0; i < tokens.size(); ++i) {
+    const auto& token = tokens.at(i);
+    std::cout << (i + 1) << sep << token_type_label(token.type) << sep
+              << token.lexeme << sep << token.line_number << sep
+              << token.character_number << '\n';
+  }
+}
+
+void print_errors_table(const std::vector<std::string>& errors) {
+  std::cerr << "Tokenization errors (" << errors.size() << "):\n";
+  if (errors.empty()) {
+    return;
+  }
+  const char* sep = " | ";
+  std::cerr << "#" << sep << "Message\n"
+            << std::string(kTableSeparatorWidth, '-') << '\n';
+  for (std::size_t i = 0; i < errors.size(); ++i) {
+    std::cerr << (i + 1) << sep << errors.at(i) << '\n';
+  }
+}
+
+auto tokenize_collecting_tokens_and_errors(tokenizer::Tokenizer& tok)
+    -> std::pair<std::vector<tokenizer::Token>, std::optional<std::string>> {
+  std::vector<tokenizer::Token> tokens;
+  try {
+    for (;;) {
+      tokenizer::Token token = tok.consume();
+      tokens.push_back(token);
+      if (token.type == tokenizer::END_OF_INPUT) {
+        break;
+      }
+    }
+    return {std::move(tokens), std::nullopt};
+  } catch (const exceptions::tokenization_exception& e) {
+    return {std::move(tokens), std::optional<std::string>(e.what())};
+  }
 }
 
 }  // namespace

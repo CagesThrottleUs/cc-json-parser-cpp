@@ -17,6 +17,11 @@ namespace detail {
 
 namespace {
 
+/**
+ * Validates the file path.
+ * @throws exceptions::file_operation_exception if file does not exist or is not
+ * a regular file.
+ */
 void validate_file_path(const std::string& filename) {
   namespace fs = std::filesystem;
   std::error_code err_code;
@@ -93,6 +98,29 @@ class Utf8FileInMemory : public Utf8File {
     return true;
   }
 
+  void put_back(codepoint_type codepoint) override {
+    if (pos == 0) {
+      return;
+    }
+    try {
+      auto iter = buffer.begin() + static_cast<std::ptrdiff_t>(pos);
+      const codepoint_type prev = utf8::prior(iter, buffer.begin());
+      if (prev != codepoint) {
+        throw exceptions::file_operation_exception(
+            "put_back: codepoint does not match byte at position");
+      }
+      pos = static_cast<std::size_t>(std::distance(buffer.begin(), iter));
+    } catch (const utf8::not_enough_room&) {  // NOLINT(bugprone-empty-catch)
+      /* Silently no-op: state unchanged. */
+    } catch (const utf8::invalid_utf8&) {
+      throw exceptions::file_operation_exception(
+          "put_back: invalid UTF-8 at position");
+    } catch (const utf8::exception& ex) {
+      throw exceptions::file_operation_exception(std::string("put_back: ") +
+                                                 ex.what());
+    }
+  }
+
   void reset() override { pos = 0; }
 
   [[nodiscard]] auto good() const -> bool override { return true; }
@@ -155,6 +183,29 @@ class Utf8MappedFile : public Utf8File {
     return true;
   }
 
+  void put_back(codepoint_type codepoint) override {
+    if (pos == 0) {
+      return;
+    }
+    try {
+      auto iter = content.begin() + static_cast<std::ptrdiff_t>(pos);
+      const codepoint_type prev = utf8::prior(iter, content.begin());
+      if (prev != codepoint) {
+        throw exceptions::file_operation_exception(
+            "put_back: codepoint does not match byte at position");
+      }
+      pos = static_cast<std::size_t>(std::distance(content.begin(), iter));
+    } catch (const utf8::not_enough_room&) {  // NOLINT(bugprone-empty-catch)
+      /* Silently no-op: state unchanged. */
+    } catch (const utf8::invalid_utf8&) {
+      throw exceptions::file_operation_exception(
+          "put_back: invalid UTF-8 at position");
+    } catch (const utf8::exception& ex) {
+      throw exceptions::file_operation_exception(std::string("put_back: ") +
+                                                 ex.what());
+    }
+  }
+
   void reset() override { pos = 0; }
 
   [[nodiscard]] auto good() const -> bool override {
@@ -209,6 +260,13 @@ auto open_utf8_file(const std::string& filename) -> std::unique_ptr<Utf8File> {
     return std::make_unique<detail::Utf8FileInMemory>(filename);
   }
   return std::make_unique<detail::Utf8MappedFile>(filename);
+}
+
+auto codepoint_to_utf8(char32_t codepoint) -> std::string {
+  std::string out;
+  utf8::append(static_cast<utf8::utfchar32_t>(codepoint),
+               std::back_inserter(out));
+  return out;
 }
 
 }  // namespace file_handler

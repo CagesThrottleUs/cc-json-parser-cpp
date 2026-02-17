@@ -6,6 +6,9 @@
 
 namespace exceptions {
 
+/**
+ * Exception thrown when a usage error occurs.
+ */
 class usage_exception : public std::exception {
  public:
   //  In this scenario, we are actually using the reference and copying -

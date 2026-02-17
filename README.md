@@ -14,45 +14,37 @@ Restart clangd after changing config: **Cmd+Shift+P** → "clangd: Restart langu
 
 ### Paths (default: Homebrew LLVM on macOS)
 
-| Purpose            | Default path |
-|--------------------|--------------|
-| LLVM install       | `/opt/homebrew/opt/llvm` |
+| Purpose            | Default path                                  |
+| ------------------ | --------------------------------------------- |
+| LLVM install       | `/opt/homebrew/opt/llvm`                      |
 | C/C++ compilers    | `/opt/homebrew/opt/llvm/bin/clang`, `clang++` |
-| C++ stdlib headers | `/opt/homebrew/opt/llvm/include/c++/v1` |
+| C++ stdlib headers | `/opt/homebrew/opt/llvm/include/c++/v1`       |
 
-If your toolchain lives elsewhere, update both **`.clangd`** and **`cmake/HomebrewLLVM.cmake`** so the IDE and build use the same paths.
+If your toolchain lives elsewhere, update both **`.clangd`**  so the IDE and build use the same paths.
 
 ### `.clangd`
 
 Configures the clangd language server so the IDE matches the build. **CompileFlags.Add** includes:
 
-| Flag / purpose | Value (adjust if your paths differ) |
-|----------------|-------------------------------------|
-| C++ standard   | `-std=c++23` |
-| C++ stdlib     | `-nostdinc++` then `-isystem /opt/homebrew/opt/llvm/include/c++/v1` (avoids using-declaration conflicts; change the path if your LLVM stdlib is elsewhere) |
-| Project includes | `-I<project-root>/include` (add `-I<project-root>/src` if headers under `src/` do not resolve) |
-| Boost          | `-isystem /opt/homebrew/opt/boost/include` |
+| Flag / purpose   | Value (adjust if your paths differ)                                                                                                                        |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C++ standard     | `-std=c++23`                                                                                                                                               |
+| C++ stdlib       | `-nostdinc++` then `-isystem /opt/homebrew/opt/llvm/include/c++/v1` (avoids using-declaration conflicts; change the path if your LLVM stdlib is elsewhere) |
+| Project includes | `-I<project-root>/include` (add `-I<project-root>/src` if headers under `src/` do not resolve)                                                             |
+| Boost            | `-isystem /opt/homebrew/opt/boost/include`                                                                                                                 |
 
 After editing `.clangd`, restart clangd (**Cmd+Shift+P** → "clangd: Restart language server").
-
-### `cmake/HomebrewLLVM.cmake`
-
-Used by the `clang-release` preset. When Homebrew LLVM exists, the build uses it.
-
-- **Compiler check** — `if(EXISTS "/opt/homebrew/opt/llvm/bin/clang++")`; change the path if your LLVM is elsewhere (or remove the block to use the default compiler).
-- **Compilers** — `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER`; set to your `clang` / `clang++` if not under `/opt/homebrew/opt/llvm/bin/`.
-- **C++ stdlib** — `CMAKE_CXX_FLAGS` appends `-isystem /opt/homebrew/opt/llvm/include/c++/v1`; change this path if your stdlib headers are elsewhere, and keep it in sync with `.clangd`.
 
 
 ## Dependencies
 
-| Dependency   | Version / Notes |
-|-------------|------------------|
-| CMake       | ≥ 3.10           |
-| C/C++ compiler | Clang or GCC (Clang recommended) |
-| Ninja       | Build generator (used by preset) |
-| **Optional** | |
-| Homebrew LLVM | If present at `/opt/homebrew/opt/llvm`, the build uses it via `cmake/HomebrewLLVM.cmake`. Otherwise the default compiler is used. |
+| Dependency     | Version / Notes                                                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| CMake          | ≥ 3.10                                                                                                                            |
+| C/C++ compiler | Clang or GCC (Clang recommended)                                                                                                  |
+| Ninja          | Build generator (used by preset)                                                                                                  |
+| **Optional**   |                                                                                                                                   |
+| Homebrew LLVM  | If present at `/opt/homebrew/opt/llvm`, the build uses it via `cmake/HomebrewLLVM.cmake`. Otherwise the default compiler is used. |
 
 ### Installing (macOS, optional)
 
@@ -69,8 +61,8 @@ cmake --preset clang-release   # or clang-debug
 cmake --build --preset clang-release   # or clang-debug
 ```
 
-| Preset        | Executable |
-|---------------|------------|
+| Preset        | Executable                                   |
+| ------------- | -------------------------------------------- |
 | clang-release | `out/build/clang-release/cc-json-parser-cpp` |
 | clang-debug   | `out/build/clang-debug/cc-json-parser-cpp`   |
 
@@ -91,7 +83,7 @@ Full suite (all `.json` under `tests/`, expected exit by filename prefix):
 
 Override parser or concurrency: `PARSER=/path/to/binary MAX_JOBS=8 ./run_tests.sh`
 
-| Prefix   | Expected exit |
-|----------|----------------|
-| invalid, fail, n_ | 1 |
-| valid, pass, i_, y_ | 0 |
+| Prefix                | Expected exit |
+| --------------------- | ------------- |
+| invalid, fail, n_, i_ | 1             |
+| valid, pass, i_, y_   | 0             |
