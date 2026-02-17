@@ -3,3 +3,5 @@ CompileFlags:
     - -nostdinc++
     - -isystem
     - /opt/homebrew/opt/llvm/include/c++/v1
+    - -std=c++23
+    - -Iinclude
