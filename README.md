@@ -54,8 +54,35 @@ brew install cmake ninja llvm
 ## Build
 
 ```bash
-cmake --preset clang-release
-cmake --build out/build/clang-release
+# Configure (once per preset)
+cmake --preset clang-release   # or clang-debug
+# Build
+cmake --build --preset clang-release   # or clang-debug
 ```
 
-Executable: `out/build/clang-release/cc-json-parser-cpp`
+| Preset        | Executable |
+|---------------|------------|
+| clang-release | `out/build/clang-release/cc-json-parser-cpp` |
+| clang-debug   | `out/build/clang-debug/cc-json-parser-cpp`   |
+
+## Run & debug
+
+The parser is invoked with a JSON file path as the first argument. Exit code **0** = valid JSON, **1** = invalid.
+
+- **VS Code**: Use the **run** task or **Debug (Clang)** launch config; you’ll be prompted for the file path.
+- **CLI**: `./out/build/clang-release/cc-json-parser-cpp path/to/file.json`
+
+## Tests
+
+Full suite (all `.json` under `tests/`, expected exit by filename prefix):
+
+```bash
+./run_tests.sh
+```
+
+Override parser or concurrency: `PARSER=/path/to/binary MAX_JOBS=8 ./run_tests.sh`
+
+| Prefix   | Expected exit |
+|----------|----------------|
+| invalid, fail, n_ | 1 |
+| valid, pass, i_, y_ | 0 |
