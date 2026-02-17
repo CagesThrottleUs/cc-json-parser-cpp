@@ -51,6 +51,12 @@ class Utf8File {
   virtual auto advance() -> bool = 0;
 
   /**
+   * Puts a codepoint back so the next read returns it.
+   * @param codepoint The codepoint to put back.
+   */
+  virtual void put_back(codepoint_type codepoint) = 0;
+
+  /**
    * Resets the file pointer to the beginning of the file.
    */
   virtual void reset() = 0;
@@ -88,6 +94,8 @@ auto get_file_load_type(const std::string& filename)
  * size < MAX_MAPPED_FILE_SIZE, else memory-mapped.
  */
 auto open_utf8_file(const std::string& filename) -> std::unique_ptr<Utf8File>;
+
+auto codepoint_to_utf8(char32_t codepoint) -> std::string;
 
 }  // namespace file_handler
 
