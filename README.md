@@ -20,7 +20,7 @@ Restart clangd after changing config: **Cmd+Shift+P** → "clangd: Restart langu
 | C/C++ compilers    | `/opt/homebrew/opt/llvm/bin/clang`, `clang++` |
 | C++ stdlib headers | `/opt/homebrew/opt/llvm/include/c++/v1` |
 
-If your toolchain lives elsewhere, update both **`.clangd`** and **`cmake/HomebrewLLVM.cmake`** so the IDE and build use the same paths.
+If your toolchain lives elsewhere, update both **`.clangd`**  so the IDE and build use the same paths.
 
 ### `.clangd`
 
@@ -34,14 +34,6 @@ Configures the clangd language server so the IDE matches the build. **CompileFla
 | Boost          | `-isystem /opt/homebrew/opt/boost/include` |
 
 After editing `.clangd`, restart clangd (**Cmd+Shift+P** → "clangd: Restart language server").
-
-### `cmake/HomebrewLLVM.cmake`
-
-Used by the `clang-release` preset. When Homebrew LLVM exists, the build uses it.
-
-- **Compiler check** — `if(EXISTS "/opt/homebrew/opt/llvm/bin/clang++")`; change the path if your LLVM is elsewhere (or remove the block to use the default compiler).
-- **Compilers** — `CMAKE_C_COMPILER` / `CMAKE_CXX_COMPILER`; set to your `clang` / `clang++` if not under `/opt/homebrew/opt/llvm/bin/`.
-- **C++ stdlib** — `CMAKE_CXX_FLAGS` appends `-isystem /opt/homebrew/opt/llvm/include/c++/v1`; change this path if your stdlib headers are elsewhere, and keep it in sync with `.clangd`.
 
 
 ## Dependencies
