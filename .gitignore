@@ -43,3 +43,4 @@
 .DS_STORE
 
 out/*
+.cursor/*
