@@ -57,7 +57,7 @@ class Tokenizer {
    */
   auto peek() -> const Token& {
     if (!hasCurrent) {
-      current = nextToken();
+      current = next_token();
     }
     return current;
   }
@@ -68,7 +68,7 @@ class Tokenizer {
    */
   auto consume() -> Token {
     if (!hasCurrent) {
-      current = nextToken();
+      current = next_token();
     }
     hasCurrent = false;
     return current;
@@ -79,7 +79,7 @@ class Tokenizer {
    * Produces the next token from the file.
    * @return The next token.
    */
-  [[nodiscard]] auto nextToken() -> Token;
+  [[nodiscard]] auto next_token() -> Token;
 };
 
 }  // namespace tokenizer

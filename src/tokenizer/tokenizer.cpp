@@ -1,7 +1,9 @@
 #include "tokenizer.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
@@ -10,6 +12,12 @@
 namespace tokenizer {
 
 namespace detail {
+
+/** JSON insignificant whitespace code points (U+0009, U+000A, U+000D, U+0020). */
+constexpr char32_t kJsonTab = 0x0009;
+constexpr char32_t kJsonLineFeed = 0x000A;
+constexpr char32_t kJsonCarriageReturn = 0x000D;
+constexpr char32_t kJsonSpace = 0x0020;
 
 /** Bundles line/column to avoid easily-swappable parameters. */
 struct Position {
@@ -55,8 +63,15 @@ inline auto is_hex_digit(const std::string& utf8_codepoint) noexcept -> bool {
 
 /** JSON disallows unescaped control characters U+0000..U+001F in strings. */
 constexpr char32_t kJsonMaxUnescapedControl = 0x001F;
+
 inline auto is_control_char(char32_t codepoint) noexcept -> bool {
   return codepoint <= kJsonMaxUnescapedControl;
+}
+
+/** Insignificant whitespace: tab, LF, CR, space. */
+inline auto is_insignificant_whitespace(char32_t codepoint) noexcept -> bool {
+  return codepoint == kJsonTab || codepoint == kJsonLineFeed ||
+         codepoint == kJsonCarriageReturn || codepoint == kJsonSpace;
 }
 
 inline auto format_error(const std::string& prefix, std::size_t line,
@@ -289,7 +304,8 @@ inline auto is_decimal_digit(const std::string& codepoint) noexcept -> bool {
   return codepoint.size() == 1 && codepoint[0] >= '0' && codepoint[0] <= '9';
 }
 
-inline auto number_ok(State next, bool put_back = false) -> NumberTransitionResult {
+inline auto number_ok(State next, bool put_back = false)
+    -> NumberTransitionResult {
   return {.next_state = next,
           .token_type = TokenType::END_OF_INPUT,
           .error_message = "",
@@ -302,8 +318,8 @@ inline auto number_error(State next, const std::string& codepoint,
     -> NumberTransitionResult {
   return {.next_state = next,
           .token_type = TokenType::END_OF_INPUT,
-          .error_message = format_error("Unexpected number: " + codepoint,
-                                        line, col, expected),
+          .error_message = format_error("Unexpected number: " + codepoint, line,
+                                        col, expected),
           .put_back_codepoint = false};
 }
 
@@ -319,20 +335,21 @@ auto handle_number_sign_start(const std::string& codepoint, std::size_t line,
                       " expected number: [0-9]");
 }
 
-auto handle_zero_start(const std::string& codepoint, std::size_t line,
-                       std::size_t col) -> NumberTransitionResult {
+auto handle_zero_start(const std::string& codepoint) -> NumberTransitionResult {
   if (codepoint == ".") {
     return number_ok(State::DECIMAL_START);
   }
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return number_error(State::DEAD, codepoint, line, col,
-                      " expected number: . or e or E");
+  return {.next_state = State::COMPLETED,
+          .token_type = TokenType::TK_NUMBER,
+          .error_message = "",
+          .put_back_codepoint = true};
 }
 
-auto handle_significant_start(const std::string& codepoint, std::size_t line,
-                              std::size_t col) -> NumberTransitionResult {
+auto handle_significant_start(const std::string& codepoint)
+    -> NumberTransitionResult {
   if (is_decimal_digit(codepoint)) {
     return number_ok(State::SIGNIFICANT_START);
   }
@@ -342,12 +359,14 @@ auto handle_significant_start(const std::string& codepoint, std::size_t line,
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return number_error(State::DEAD, codepoint, line, col,
-                      " expected number: [0-9]");
+  return {.next_state = State::COMPLETED,
+          .token_type = TokenType::TK_NUMBER,
+          .error_message = "",
+          .put_back_codepoint = true};
 }
 
 auto handle_decimal_start(const std::string& codepoint, std::size_t line,
-                         std::size_t col) -> NumberTransitionResult {
+                          std::size_t col) -> NumberTransitionResult {
   if (is_decimal_digit(codepoint)) {
     return number_ok(State::DECIMAL_DIGIT);
   }
@@ -355,8 +374,8 @@ auto handle_decimal_start(const std::string& codepoint, std::size_t line,
                       " expected at least one decimal digit");
 }
 
-auto handle_decimal_digit(State current, const std::string& codepoint,
-                         std::size_t /* line */, std::size_t /* col */)
+auto handle_decimal_digit(State /* current */, const std::string& codepoint,
+                          std::size_t /* line */, std::size_t /* col */)
     -> NumberTransitionResult {
   if (is_decimal_digit(codepoint)) {
     return number_ok(State::DECIMAL_DIGIT);
@@ -364,7 +383,10 @@ auto handle_decimal_digit(State current, const std::string& codepoint,
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return number_ok(current);
+  return {.next_state = State::COMPLETED,
+          .token_type = TokenType::TK_NUMBER,
+          .error_message = "",
+          .put_back_codepoint = true};
 }
 
 auto handle_exponent_start(const std::string& codepoint, std::size_t line,
@@ -407,9 +429,9 @@ inline auto handle_number_state(State current,
     case State::NUMBER_SIGN_START:
       return handle_number_sign_start(utf8_codepoint, line, col);
     case State::ZERO_START:
-      return handle_zero_start(utf8_codepoint, line, col);
+      return handle_zero_start(utf8_codepoint);
     case State::SIGNIFICANT_START:
-      return handle_significant_start(utf8_codepoint, line, col);
+      return handle_significant_start(utf8_codepoint);
     case State::DECIMAL_START:
       return handle_decimal_start(utf8_codepoint, line, col);
     case State::DECIMAL_DIGIT:
@@ -454,17 +476,17 @@ struct StateStepResult {
   bool put_back = false;
 };
 
-StateStepResult process_state_step(
-    State current_state, char32_t codepoint, const std::string& utf8_codepoint,
-    const std::string& lexeme, std::size_t line_number,
-    std::size_t character_number) {
+auto process_state_step(State current_state, char32_t codepoint,
+                        const std::string& utf8_codepoint,
+                        const std::string& lexeme, std::size_t line_number,
+                        std::size_t character_number) -> StateStepResult {
   switch (current_state) {
     case State::START: {
       auto [new_state, new_token_type] = handle_start(utf8_codepoint);
       std::string err;
       if (new_state == State::DEAD) {
-        err = format_error("Unknown character: " + utf8_codepoint,
-                           line_number, character_number);
+        err = format_error("Unknown character: " + utf8_codepoint, line_number,
+                           character_number);
       }
       return {.next_state = new_state,
               .token_type = new_token_type,
@@ -474,7 +496,7 @@ StateStepResult process_state_step(
     case State::IN_FALSE:
     case State::IN_NULL: {
       auto res = handle_literal_state(current_state, lexeme, utf8_codepoint,
-                                     line_number, character_number);
+                                      line_number, character_number);
       if (!res) {
         return {.next_state = current_state,
                 .token_type = TokenType::END_OF_INPUT,
@@ -522,7 +544,7 @@ StateStepResult process_state_step(
 
 }  // namespace detail
 
-auto Tokenizer::nextToken() -> Token {
+auto Tokenizer::next_token() -> Token {
   auto current_state = detail::State::START;
   std::string lexeme;
   TokenType token_type = TokenType::END_OF_INPUT;
@@ -536,6 +558,18 @@ auto Tokenizer::nextToken() -> Token {
                    .character_number = character_number};
     }
 
+    if (current_state == detail::State::START &&
+        detail::is_insignificant_whitespace(*codepoint)) {
+      if (*codepoint == detail::kJsonLineFeed ||
+          *codepoint == detail::kJsonCarriageReturn) {
+        line_number++;
+        character_number = 1;
+      } else {
+        character_number++;
+      }
+      continue;
+    }
+
     const auto utf8_codepoint = file_handler::codepoint_to_utf8(*codepoint);
     lexeme += utf8_codepoint;
     if (utf8_codepoint == "\n") {
@@ -545,9 +579,9 @@ auto Tokenizer::nextToken() -> Token {
       character_number++;
     }
 
-    auto result = detail::process_state_step(
-        current_state, *codepoint, utf8_codepoint, lexeme, line_number,
-        character_number);
+    auto result =
+        detail::process_state_step(current_state, *codepoint, utf8_codepoint,
+                                   lexeme, line_number, character_number);
     current_state = result.next_state;
     token_type = result.token_type;
     if (!result.error_message.empty()) {
