@@ -27,5 +27,9 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     }
+  ],
+  "buildPresets": [
+    {"name": "clang-release", "configurePreset": "clang-release"},
+    {"name": "clang-debug", "configurePreset": "clang-debug"}
   ]
 }
