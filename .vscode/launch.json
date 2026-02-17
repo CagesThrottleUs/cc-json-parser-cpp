@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    
+    {
+      "name": "Debug (Clang)",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/out/build/clang-debug/cc-json-parser-cpp",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "cmake-build-debug",
+      "MIMode": "lldb"
+    },
+    {
+      "name": "Debug (Clang) — no build",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/out/build/clang-debug/cc-json-parser-cpp",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "MIMode": "lldb"
+    }
+  ]
+}

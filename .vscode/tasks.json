@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "cmake-configure-release",
+      "type": "shell",
+      "command": "cmake --preset clang-release",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "cmake-build",
+      "type": "shell",
+      "command": "cmake --build --preset clang-release",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "dependsOn": "cmake-configure-release",
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "cmake-configure-debug",
+      "type": "shell",
+      "command": "cmake --preset clang-debug",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "cmake-build-debug",
+      "type": "shell",
+      "command": "cmake --build --preset clang-debug",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "dependsOn": "cmake-configure-debug",
+      "presentation": { "reveal": "silent" }
+    },
+    {
+      "label": "run",
+      "type": "shell",
+      "command": "${workspaceFolder}/out/build/clang-release/cc-json-parser-cpp",
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "dependsOn": "cmake-build",
+      "presentation": { "reveal": "always" }
+    }
+  ]
+}
