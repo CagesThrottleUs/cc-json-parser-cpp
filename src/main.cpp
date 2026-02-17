@@ -13,10 +13,25 @@
 
 namespace {
 
+/**
+ * Checks the usage of the command line arguments.
+ * @param args The command line arguments.
+ * @throws exceptions::usage_exception if the usage error is detected.
+ */
 void handle_usage_error(const std::span<char*>& args);
 
-void run_trial(const std::string& filename);
+/**
+ * Logs the file and returns the stream.
+ * @param filename The name of the JSON file to run the trial on.
+ */
+[[nodiscard]] auto log_file_and_get_stream(const std::string& filename)
+    -> std::unique_ptr<file_handler::Utf8File>;
 
+/**
+ * Converts a codepoint to a UTF-8 string.
+ * @param codepoint The codepoint to convert.
+ * @return The UTF-8 string.
+ */
 auto codepoint_to_utf8(char32_t codepoint) -> std::string;
 
 }  // namespace
@@ -26,7 +41,7 @@ auto main(int argc, char** argv) -> int {
 
   try {
     handle_usage_error(args);
-    run_trial(args[1]);
+    auto stream = log_file_and_get_stream(args[1]);
     return std::to_underlying(constants::exit_codes::VALID_JSON);
   } catch (const exceptions::usage_exception& e) {
     std::cerr << e.what() << '\n';
@@ -55,15 +70,15 @@ void handle_usage_error(const std::span<char*>& args) {
   }
 }
 
-void run_trial(const std::string& filename) {
+auto log_file_and_get_stream(const std::string& filename)
+    -> std::unique_ptr<file_handler::Utf8File> {
   const constants::file_load_type load_type =
       file_handler::get_file_load_type(filename);
   const char* load_name = (load_type == constants::file_load_type::FullMemory)
                               ? "FullMemory"
                               : "MemoryMapped";
 
-  std::unique_ptr<file_handler::Utf8File> file =
-      file_handler::open_utf8_file(filename);
+  auto file = file_handler::open_utf8_file(filename);
 
   std::cout << "--- file ---\n";
   std::cout << "  path:      " << filename << "\n";
@@ -93,6 +108,10 @@ void run_trial(const std::string& filename) {
     file->advance();
   }
   std::cout << "  atEnd: " << (file->at_end() ? "yes" : "no") << "\n";
+
+  file->reset();
+
+  return file;
 }
 
 auto codepoint_to_utf8(char32_t codepoint) -> std::string {
