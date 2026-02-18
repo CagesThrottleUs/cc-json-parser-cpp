@@ -61,7 +61,11 @@ class utf8_in_memory_file : public utf8_file {
           std::to_string(MAX_MAPPED_FILE_SIZE) + "): " + filename);
     }
     stream.seekg(0);
+    
+    // Resize buffer to hold the file content. 
+    // std::vector guarantees contiguous memory storage.
     buffer.resize(stream_size);
+    
     if (stream_size > 0U &&
         !stream.read(buffer.data(),
                      static_cast<std::streamsize>(stream_size))) {
@@ -128,6 +132,16 @@ class utf8_in_memory_file : public utf8_file {
     }
   }
 
+  void revert() override {
+    if (pos == 0) {
+      return;
+    }
+    // utf8::prior decrements the iterator to the start of the previous codepoint
+    auto iter = buffer.begin() + static_cast<std::ptrdiff_t>(pos);
+    utf8::prior(iter, buffer.begin());
+    pos = static_cast<std::size_t>(std::distance(buffer.begin(), iter));
+  }
+
   void reset() override { pos = 0; }
 
   [[nodiscard]] auto good() const -> bool override { return true; }
@@ -142,9 +156,24 @@ class utf8_in_memory_file : public utf8_file {
     return pos >= buffer.size();
   }
 
+  [[nodiscard]] auto data() const noexcept -> const char* override {
+    return buffer.data();
+  }
+
+  [[nodiscard]] auto current_offset() const noexcept -> std::size_t override {
+    return pos;
+  }
+
  private:
   std::string file_name;
-  std::string buffer;
+  /**
+   * Raw buffer for file contents.
+   * Using std::vector<char> instead of std::string because this is a raw byte
+   * buffer that happens to be UTF-8, not necessarily a processed C-string.
+   * std::vector avoids string semantics (like null-termination) and is the
+   * standard container for contiguous memory buffers.
+   */
+  std::vector<char> buffer;
   std::size_t pos{0};
 };
 
@@ -222,6 +251,15 @@ class utf8_mmap_file : public utf8_file {
     }
   }
 
+  void revert() override {
+    if (pos == 0) {
+      return;
+    }
+    auto iter = content.begin() + static_cast<std::ptrdiff_t>(pos);
+    utf8::prior(iter, content.begin());
+    pos = static_cast<std::size_t>(std::distance(content.begin(), iter));
+  }
+
   void reset() override { pos = 0; }
 
   [[nodiscard]] auto good() const -> bool override {
@@ -236,6 +274,14 @@ class utf8_mmap_file : public utf8_file {
 
   [[nodiscard]] auto at_end() const noexcept -> bool override {
     return pos >= content.size();
+  }
+
+  [[nodiscard]] auto data() const noexcept -> const char* override {
+    return content.data();
+  }
+
+  [[nodiscard]] auto current_offset() const noexcept -> std::size_t override {
+    return pos;
   }
 
  private:
