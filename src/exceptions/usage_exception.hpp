@@ -19,6 +19,12 @@ class usage_exception : public std::exception {
   explicit usage_exception(std::string message)
       : message_(std::move(message)) {}
 
+  ~usage_exception() override;
+  usage_exception(const usage_exception&) = default;
+  usage_exception(usage_exception&&) = default;
+  auto operator=(const usage_exception&) -> usage_exception& = default;
+  auto operator=(usage_exception&&) -> usage_exception& = default;
+
   [[nodiscard]] auto what() const noexcept -> const char* override {
     return message_.c_str();
   }

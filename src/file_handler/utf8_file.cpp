@@ -7,6 +7,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 
 #include "../exceptions/file_operation_exception.hpp"
 #include "utf8/checked.h"
@@ -34,7 +35,6 @@ void validate_file_path(const std::string& filename) {
     throw exceptions::file_operation_exception("Not a regular file: " +
                                                filename);
   }
-  const auto file_size = fs::file_size(file_path, err_code);
   if (err_code) {
     throw exceptions::file_operation_exception("Cannot get file size: " +
                                                filename);
@@ -44,9 +44,10 @@ void validate_file_path(const std::string& filename) {
 }  // namespace
 
 // --- Full in-memory implementation ---
-class Utf8FileInMemory : public Utf8File {
+class utf8_in_memory_file : public utf8_file {
  public:
-  explicit Utf8FileInMemory(const std::string& filename) : file_name(filename) {
+  explicit utf8_in_memory_file(const std::string& filename)
+      : file_name(filename) {
     std::ifstream stream(filename, std::ios::binary);
     if (!stream) {
       throw exceptions::file_operation_exception("Cannot open file: " +
@@ -68,6 +69,12 @@ class Utf8FileInMemory : public Utf8File {
                                                  filename);
     }
   }
+
+  ~utf8_in_memory_file() override;
+  utf8_in_memory_file(const utf8_in_memory_file&) = delete;
+  auto operator=(const utf8_in_memory_file&) -> utf8_in_memory_file& = delete;
+  utf8_in_memory_file(utf8_in_memory_file&&) = delete;
+  auto operator=(utf8_in_memory_file&&) -> utf8_in_memory_file& = delete;
 
   auto next_codepoint() -> std::optional<codepoint_type> override {
     if (pos >= buffer.size()) {
@@ -141,18 +148,27 @@ class Utf8FileInMemory : public Utf8File {
   std::size_t pos{0};
 };
 
+utf8_in_memory_file::~utf8_in_memory_file() = default;
+
 // --- Memory-mapped implementation ---
-class Utf8MappedFile : public Utf8File {
+class utf8_mmap_file : public utf8_file {
  public:
-  explicit Utf8MappedFile(const std::string& filename) : file_name(filename) {
+  explicit utf8_mmap_file(const std::string& filename) : file_name(filename) {
     validate_file_path(filename);
     mmap_file_src.open(filename);
     if (!mmap_file_src.is_open()) {
       throw exceptions::file_operation_exception("Failed to memory-map file: " +
                                                  filename);
     }
-    content = std::span<const char>(mmap_file_src.data(), mmap_file_src.size());
+    content = std::span<const char>(
+        std::string_view(mmap_file_src.data(), mmap_file_src.size()));
   }
+
+  ~utf8_mmap_file() override;
+  utf8_mmap_file(const utf8_mmap_file&) = delete;
+  auto operator=(const utf8_mmap_file&) -> utf8_mmap_file& = delete;
+  utf8_mmap_file(utf8_mmap_file&&) = delete;
+  auto operator=(utf8_mmap_file&&) -> utf8_mmap_file& = delete;
 
   auto next_codepoint() -> std::optional<codepoint_type> override {
     if (pos >= content.size()) {
@@ -229,6 +245,8 @@ class Utf8MappedFile : public Utf8File {
   std::size_t pos{0};
 };
 
+utf8_mmap_file::~utf8_mmap_file() = default;
+
 }  // namespace detail
 
 auto get_file_load_type(const std::string& filename)
@@ -254,12 +272,12 @@ auto get_file_load_type(const std::string& filename)
              : constants::file_load_type::MemoryMapped;
 }
 
-auto open_utf8_file(const std::string& filename) -> std::unique_ptr<Utf8File> {
+auto open_utf8_file(const std::string& filename) -> std::unique_ptr<utf8_file> {
   const constants::file_load_type load_type = get_file_load_type(filename);
   if (load_type == constants::file_load_type::FullMemory) {
-    return std::make_unique<detail::Utf8FileInMemory>(filename);
+    return std::make_unique<detail::utf8_in_memory_file>(filename);
   }
-  return std::make_unique<detail::Utf8MappedFile>(filename);
+  return std::make_unique<detail::utf8_mmap_file>(filename);
 }
 
 auto codepoint_to_utf8(char32_t codepoint) -> std::string {

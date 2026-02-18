@@ -1,23 +1,24 @@
 #include "tokenizer.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <iostream>
 #include <optional>
 #include <string>
-#include <unordered_map>
+#include <string_view>
 #include <utility>
-
-#include "../exceptions/tokenization_exception.hpp"
 
 namespace tokenizer {
 
 namespace detail {
 
-/** JSON insignificant whitespace code points (U+0009, U+000A, U+000D, U+0020). */
-constexpr char32_t kJsonTab = 0x0009;
-constexpr char32_t kJsonLineFeed = 0x000A;
-constexpr char32_t kJsonCarriageReturn = 0x000D;
-constexpr char32_t kJsonSpace = 0x0020;
+/** JSON insignificant whitespace code points (U+0009, U+000A, U+000D, U+0020).
+ */
+constexpr char32_t JSON_TAB = 0x0009;
+constexpr char32_t JSON_LINE_FEED = 0x000A;
+constexpr char32_t JSON_CARRIAGE_RETURN = 0x000D;
+constexpr char32_t JSON_SPACE = 0x0020;
 
 /** Bundles line/column to avoid easily-swappable parameters. */
 struct Position {
@@ -62,16 +63,16 @@ inline auto is_hex_digit(const std::string& utf8_codepoint) noexcept -> bool {
 }
 
 /** JSON disallows unescaped control characters U+0000..U+001F in strings. */
-constexpr char32_t kJsonMaxUnescapedControl = 0x001F;
+constexpr char32_t JSON_MAX_UNESPACED_CONTROL = 0x001F;
 
 inline auto is_control_char(char32_t codepoint) noexcept -> bool {
-  return codepoint <= kJsonMaxUnescapedControl;
+  return codepoint <= JSON_MAX_UNESPACED_CONTROL;
 }
 
 /** Insignificant whitespace: tab, LF, CR, space. */
 inline auto is_insignificant_whitespace(char32_t codepoint) noexcept -> bool {
-  return codepoint == kJsonTab || codepoint == kJsonLineFeed ||
-         codepoint == kJsonCarriageReturn || codepoint == kJsonSpace;
+  return codepoint == JSON_TAB || codepoint == JSON_LINE_FEED ||
+         codepoint == JSON_CARRIAGE_RETURN || codepoint == JSON_SPACE;
 }
 
 inline auto format_error(const std::string& prefix, std::size_t line,
@@ -107,24 +108,28 @@ inline auto determine_number_start(const std::string& utf8_codepoint) noexcept
   return State::SIGNIFICANT_START;
 }
 
+constexpr std::array<std::pair<std::string_view, std::pair<State, TokenType>>,
+                     10>
+    START_TRANSITIONS{{
+        {"[", {State::COMPLETED, TokenType::TK_OPEN_BRACKET}},
+        {"]", {State::COMPLETED, TokenType::TK_CLOSE_BRACKET}},
+        {"{", {State::COMPLETED, TokenType::TK_OPEN_BRACE}},
+        {"}", {State::COMPLETED, TokenType::TK_CLOSE_BRACE}},
+        {":", {State::COMPLETED, TokenType::TK_COLON}},
+        {",", {State::COMPLETED, TokenType::TK_COMMA}},
+        {"t", {State::IN_TRUE, TokenType::END_OF_INPUT}},
+        {"f", {State::IN_FALSE, TokenType::END_OF_INPUT}},
+        {"n", {State::IN_NULL, TokenType::END_OF_INPUT}},
+        {"\"", {State::IN_STRING, TokenType::END_OF_INPUT}},
+    }};
+
 inline auto handle_start(const std::string& utf8_codepoint) noexcept
     -> std::pair<State, TokenType> {
-  static const std::unordered_map<std::string, std::pair<State, TokenType>>
-      kStart{
-          {"[", {State::COMPLETED, TokenType::TK_OPEN_BRACKET}},
-          {"]", {State::COMPLETED, TokenType::TK_CLOSE_BRACKET}},
-          {"{", {State::COMPLETED, TokenType::TK_OPEN_BRACE}},
-          {"}", {State::COMPLETED, TokenType::TK_CLOSE_BRACE}},
-          {":", {State::COMPLETED, TokenType::TK_COLON}},
-          {",", {State::COMPLETED, TokenType::TK_COMMA}},
-          {"t", {State::IN_TRUE, TokenType::END_OF_INPUT}},
-          {"f", {State::IN_FALSE, TokenType::END_OF_INPUT}},
-          {"n", {State::IN_NULL, TokenType::END_OF_INPUT}},
-          {"\"", {State::IN_STRING, TokenType::END_OF_INPUT}},
-      };
-  auto itr = kStart.find(utf8_codepoint);
-  if (itr != kStart.end()) {
-    return itr->second;
+  const std::string_view key(utf8_codepoint);
+  for (const auto& [arr_key, arr_val] : START_TRANSITIONS) {
+    if (arr_key == key) {
+      return arr_val;
+    }
   }
   if (is_digit(utf8_codepoint)) {
     return {determine_number_start(utf8_codepoint), TokenType::END_OF_INPUT};
@@ -184,6 +189,8 @@ inline auto handle_literal_state(State current, const std::string& lexeme,
     -> std::optional<LiteralResult> {
   auto comparator = std::string{};
   auto completed_type = TokenType::END_OF_INPUT;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
   switch (current) {
     case State::IN_TRUE:
       comparator = "true";
@@ -200,6 +207,7 @@ inline auto handle_literal_state(State current, const std::string& lexeme,
     default:
       return std::nullopt;
   }
+#pragma clang diagnostic pop
   return handle_literal(lexeme, comparator, completed_type, utf8_codepoint,
                         line_num, char_num);
 }
@@ -214,6 +222,8 @@ inline auto handle_string_state(State current, char32_t codepoint,
                                 const std::string& utf8_codepoint,
                                 std::size_t line, std::size_t col)
     -> StringTransitionResult {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
   switch (current) {
     case State::IN_STRING:
       if (utf8_codepoint == "\"") {
@@ -260,6 +270,8 @@ inline auto handle_string_state(State current, char32_t codepoint,
     case State::HEX_TWO:
     case State::HEX_THREE: {
       State next_state = State::DEAD;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
       switch (current) {
         case State::STRING_UNICODE_ESCAPE_SEQUENCE:
           next_state = State::HEX_ONE;
@@ -276,6 +288,7 @@ inline auto handle_string_state(State current, char32_t codepoint,
         default:
           break;
       }
+#pragma clang diagnostic pop
       if (is_hex_digit(utf8_codepoint)) {
         return {.next_state = next_state,
                 .token_type = TokenType::END_OF_INPUT,
@@ -291,14 +304,18 @@ inline auto handle_string_state(State current, char32_t codepoint,
               .token_type = TokenType::END_OF_INPUT,
               .error_message = ""};
   }
+#pragma clang diagnostic pop
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpadded"
 struct NumberTransitionResult {
+  std::string error_message;
   State next_state;
   TokenType token_type;
-  std::string error_message;
   bool put_back_codepoint = false;
 };
+#pragma clang diagnostic pop
 
 inline auto is_decimal_digit(const std::string& codepoint) noexcept -> bool {
   return codepoint.size() == 1 && codepoint[0] >= '0' && codepoint[0] <= '9';
@@ -306,9 +323,9 @@ inline auto is_decimal_digit(const std::string& codepoint) noexcept -> bool {
 
 inline auto number_ok(State next, bool put_back = false)
     -> NumberTransitionResult {
-  return {.next_state = next,
+  return {.error_message = "",
+          .next_state = next,
           .token_type = TokenType::END_OF_INPUT,
-          .error_message = "",
           .put_back_codepoint = put_back};
 }
 
@@ -316,10 +333,10 @@ inline auto number_error(State next, const std::string& codepoint,
                          std::size_t line, std::size_t col,
                          const std::string& expected)
     -> NumberTransitionResult {
-  return {.next_state = next,
-          .token_type = TokenType::END_OF_INPUT,
-          .error_message = format_error("Unexpected number: " + codepoint, line,
+  return {.error_message = format_error("Unexpected number: " + codepoint, line,
                                         col, expected),
+          .next_state = next,
+          .token_type = TokenType::END_OF_INPUT,
           .put_back_codepoint = false};
 }
 
@@ -342,9 +359,9 @@ auto handle_zero_start(const std::string& codepoint) -> NumberTransitionResult {
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return {.next_state = State::COMPLETED,
+  return {.error_message = "",
+          .next_state = State::COMPLETED,
           .token_type = TokenType::TK_NUMBER,
-          .error_message = "",
           .put_back_codepoint = true};
 }
 
@@ -359,9 +376,9 @@ auto handle_significant_start(const std::string& codepoint)
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return {.next_state = State::COMPLETED,
+  return {.error_message = "",
+          .next_state = State::COMPLETED,
           .token_type = TokenType::TK_NUMBER,
-          .error_message = "",
           .put_back_codepoint = true};
 }
 
@@ -383,9 +400,9 @@ auto handle_decimal_digit(State /* current */, const std::string& codepoint,
   if (codepoint == "e" || codepoint == "E") {
     return number_ok(State::EXPONENT_START);
   }
-  return {.next_state = State::COMPLETED,
+  return {.error_message = "",
+          .next_state = State::COMPLETED,
           .token_type = TokenType::TK_NUMBER,
-          .error_message = "",
           .put_back_codepoint = true};
 }
 
@@ -415,9 +432,9 @@ auto handle_exponent_digit(const std::string& codepoint)
   if (is_decimal_digit(codepoint)) {
     return number_ok(State::EXPONENT_DIGIT);
   }
-  return {.next_state = State::COMPLETED,
+  return {.error_message = "",
+          .next_state = State::COMPLETED,
           .token_type = TokenType::TK_NUMBER,
-          .error_message = "",
           .put_back_codepoint = true};
 }
 
@@ -425,6 +442,8 @@ inline auto handle_number_state(State current,
                                 const std::string& utf8_codepoint,
                                 std::size_t line, std::size_t col)
     -> NumberTransitionResult {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
   switch (current) {
     case State::NUMBER_SIGN_START:
       return handle_number_sign_start(utf8_codepoint, line, col);
@@ -445,9 +464,10 @@ inline auto handle_number_state(State current,
     default:
       return number_ok(current);
   }
+#pragma clang diagnostic pop
 }
 
-void advance_past_dead_chars(file_handler::Utf8File& file, Position& pos) {
+void advance_past_dead_chars(file_handler::utf8_file& file, Position& pos) {
   auto state = State::DEAD;
   while (!file.at_end() && !is_done(state)) {
     auto codepoint = file.peek_codepoint();
@@ -469,17 +489,22 @@ void advance_past_dead_chars(file_handler::Utf8File& file, Position& pos) {
   }
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpadded"
 struct StateStepResult {
+  std::string error_message;
   State next_state;
   TokenType token_type;
-  std::string error_message;
   bool put_back = false;
 };
+#pragma clang diagnostic pop
 
 auto process_state_step(State current_state, char32_t codepoint,
                         const std::string& utf8_codepoint,
                         const std::string& lexeme, std::size_t line_number,
                         std::size_t character_number) -> StateStepResult {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wswitch-enum"
   switch (current_state) {
     case State::START: {
       auto [new_state, new_token_type] = handle_start(utf8_codepoint);
@@ -488,9 +513,10 @@ auto process_state_step(State current_state, char32_t codepoint,
         err = format_error("Unknown character: " + utf8_codepoint, line_number,
                            character_number);
       }
-      return {.next_state = new_state,
+      return {.error_message = std::move(err),
+              .next_state = new_state,
               .token_type = new_token_type,
-              .error_message = std::move(err)};
+              .put_back = false};
     }
     case State::IN_TRUE:
     case State::IN_FALSE:
@@ -498,13 +524,15 @@ auto process_state_step(State current_state, char32_t codepoint,
       auto res = handle_literal_state(current_state, lexeme, utf8_codepoint,
                                       line_number, character_number);
       if (!res) {
-        return {.next_state = current_state,
+        return {.error_message = {},
+                .next_state = current_state,
                 .token_type = TokenType::END_OF_INPUT,
-                .error_message = {}};
+                .put_back = false};
       }
-      return {.next_state = res->state,
+      return {.error_message = std::move(res->error_message),
+              .next_state = res->state,
               .token_type = res->token_type,
-              .error_message = std::move(res->error_message)};
+              .put_back = false};
     }
     case State::IN_STRING:
     case State::STRING_ESCAPE_SEQUENCE:
@@ -514,9 +542,10 @@ auto process_state_step(State current_state, char32_t codepoint,
     case State::HEX_THREE: {
       auto res = handle_string_state(current_state, codepoint, utf8_codepoint,
                                      line_number, character_number);
-      return {.next_state = res.next_state,
+      return {.error_message = std::move(res.error_message),
+              .next_state = res.next_state,
               .token_type = res.token_type,
-              .error_message = std::move(res.error_message)};
+              .put_back = false};
     }
     case State::NUMBER_SIGN_START:
     case State::ZERO_START:
@@ -528,16 +557,23 @@ auto process_state_step(State current_state, char32_t codepoint,
     case State::EXPONENT_DIGIT: {
       auto num_res = handle_number_state(current_state, utf8_codepoint,
                                          line_number, character_number);
-      return {.next_state = num_res.next_state,
+      return {.error_message = std::move(num_res.error_message),
+              .next_state = num_res.next_state,
               .token_type = num_res.token_type,
-              .error_message = std::move(num_res.error_message),
               .put_back = num_res.put_back_codepoint};
     }
     default:
-      return {.next_state = current_state,
+      return {.error_message = {},
+              .next_state = current_state,
               .token_type = TokenType::END_OF_INPUT,
-              .error_message = {}};
+              .put_back = false};
   }
+#pragma clang diagnostic pop
+}
+
+inline auto is_number_state(State state) noexcept -> bool {
+  return state == State::ZERO_START || state == State::SIGNIFICANT_START ||
+         state == State::DECIMAL_DIGIT || state == State::EXPONENT_DIGIT;
 }
 
 }  // namespace
@@ -552,16 +588,16 @@ auto Tokenizer::next_token() -> Token {
   while (!file->at_end() && !detail::is_done(current_state)) {
     auto codepoint = file->next_codepoint();
     if (!codepoint) {
-      return Token{.type = token_type,
-                   .lexeme = lexeme,
+      return Token{.lexeme = lexeme,
                    .line_number = line_number,
-                   .character_number = character_number};
+                   .character_number = character_number,
+                   .type = token_type};
     }
 
     if (current_state == detail::State::START &&
         detail::is_insignificant_whitespace(*codepoint)) {
-      if (*codepoint == detail::kJsonLineFeed ||
-          *codepoint == detail::kJsonCarriageReturn) {
+      if (*codepoint == detail::JSON_LINE_FEED ||
+          *codepoint == detail::JSON_CARRIAGE_RETURN) {
         line_number++;
         character_number = 1;
       } else {
@@ -598,13 +634,23 @@ auto Tokenizer::next_token() -> Token {
     detail::advance_past_dead_chars(*file, pos);
     line_number = pos.line;
     character_number = pos.column;
-    throw exceptions::tokenization_exception(error_message);
+    if (!error_message.empty()) {
+      std::cerr << error_message << '\n';
+    }
+    return Token{.lexeme = error_message,
+                 .line_number = line_number,
+                 .character_number = character_number,
+                 .type = TokenType::TK_ERROR};
   }
 
-  return Token{.type = token_type,
-               .lexeme = lexeme,
+  if (detail::is_number_state(current_state) && file->at_end()) {
+    token_type = TokenType::TK_NUMBER;
+  }
+
+  return Token{.lexeme = lexeme,
                .line_number = line_number,
-               .character_number = character_number};
+               .character_number = character_number,
+               .type = token_type};
 }
 
 }  // namespace tokenizer
