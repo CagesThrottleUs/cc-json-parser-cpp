@@ -108,24 +108,28 @@ inline auto determine_number_start(const std::string& utf8_codepoint) noexcept
   return State::SIGNIFICANT_START;
 }
 
+constexpr std::array<std::pair<std::string_view, std::pair<State, TokenType>>,
+                     10>
+    START_TRANSITIONS{{
+        {"[", {State::COMPLETED, TokenType::TK_OPEN_BRACKET}},
+        {"]", {State::COMPLETED, TokenType::TK_CLOSE_BRACKET}},
+        {"{", {State::COMPLETED, TokenType::TK_OPEN_BRACE}},
+        {"}", {State::COMPLETED, TokenType::TK_CLOSE_BRACE}},
+        {":", {State::COMPLETED, TokenType::TK_COLON}},
+        {",", {State::COMPLETED, TokenType::TK_COMMA}},
+        {"t", {State::IN_TRUE, TokenType::END_OF_INPUT}},
+        {"f", {State::IN_FALSE, TokenType::END_OF_INPUT}},
+        {"n", {State::IN_NULL, TokenType::END_OF_INPUT}},
+        {"\"", {State::IN_STRING, TokenType::END_OF_INPUT}},
+    }};
+
 inline auto handle_start(const std::string& utf8_codepoint) noexcept
     -> std::pair<State, TokenType> {
-  static const std::unordered_map<std::string, std::pair<State, TokenType>>
-      kStart{
-          {"[", {State::COMPLETED, TokenType::TK_OPEN_BRACKET}},
-          {"]", {State::COMPLETED, TokenType::TK_CLOSE_BRACKET}},
-          {"{", {State::COMPLETED, TokenType::TK_OPEN_BRACE}},
-          {"}", {State::COMPLETED, TokenType::TK_CLOSE_BRACE}},
-          {":", {State::COMPLETED, TokenType::TK_COLON}},
-          {",", {State::COMPLETED, TokenType::TK_COMMA}},
-          {"t", {State::IN_TRUE, TokenType::END_OF_INPUT}},
-          {"f", {State::IN_FALSE, TokenType::END_OF_INPUT}},
-          {"n", {State::IN_NULL, TokenType::END_OF_INPUT}},
-          {"\"", {State::IN_STRING, TokenType::END_OF_INPUT}},
-      };
-  auto itr = kStart.find(utf8_codepoint);
-  if (itr != kStart.end()) {
-    return itr->second;
+  const std::string_view key(utf8_codepoint);
+  for (const auto& [arr_key, arr_val] : START_TRANSITIONS) {
+    if (arr_key == key) {
+      return arr_val;
+    }
   }
   if (is_digit(utf8_codepoint)) {
     return {determine_number_start(utf8_codepoint), TokenType::END_OF_INPUT};
