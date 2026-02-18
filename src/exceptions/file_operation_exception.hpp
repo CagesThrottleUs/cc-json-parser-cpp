@@ -14,6 +14,12 @@ class file_operation_exception : public std::exception {
   explicit file_operation_exception(std::string message)
       : message_(std::move(message)) {}
 
+  ~file_operation_exception() override;
+  file_operation_exception(const file_operation_exception&) = default;
+  file_operation_exception(file_operation_exception&&) = default;
+  auto operator=(const file_operation_exception&) -> file_operation_exception& = default;
+  auto operator=(file_operation_exception&&) -> file_operation_exception& = default;
+
   [[nodiscard]] auto what() const noexcept -> const char* override {
     return message_.c_str();
   }

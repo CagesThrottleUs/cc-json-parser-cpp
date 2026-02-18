@@ -15,6 +15,12 @@ class tokenization_exception : public std::exception {
   explicit tokenization_exception(std::string message) noexcept
       : message_(std::move(message)) {}
 
+  ~tokenization_exception() override;
+  tokenization_exception(const tokenization_exception&) = default;
+  tokenization_exception(tokenization_exception&&) = default;
+  auto operator=(const tokenization_exception&) -> tokenization_exception& = default;
+  auto operator=(tokenization_exception&&) -> tokenization_exception& = default;
+
   [[nodiscard]] auto what() const noexcept -> const char* override {
     return message_.c_str();
   }
