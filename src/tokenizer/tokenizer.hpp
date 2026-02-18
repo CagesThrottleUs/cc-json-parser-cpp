@@ -1,6 +1,7 @@
 #ifndef TOKENIZER_TOKENIZER_HPP
 #define TOKENIZER_TOKENIZER_HPP
 
+#include <string_view>
 #include <memory>
 
 #include "../file_handler/utf8_file.hpp"
@@ -29,11 +30,12 @@ enum TokenType : int {  // NOLINT(performance-enum-size)
 
 /**
  * A token is a unit of input that is recognized by the tokenizer.
+ * Uses std::string_view for zero-copy tokenization.
  */
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpadded"
 struct Token {
-  std::string lexeme;
+  std::string_view lexeme;
   std::size_t line_number;
   std::size_t character_number;
   TokenType type;
@@ -85,6 +87,11 @@ class Tokenizer {
    * @return The next token.
    */
   [[nodiscard]] auto next_token() -> Token;
+
+  /**
+   * Updates line and character numbers based on the codepoint.
+   */
+  void update_position(char32_t codepoint);
 };
 #pragma clang diagnostic pop
 
