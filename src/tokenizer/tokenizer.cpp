@@ -137,8 +137,8 @@ inline auto handle_start(const std::string& utf8_codepoint) noexcept
   return {State::DEAD, TokenType::END_OF_INPUT};
 }
 
-inline auto handle_deterministic(const std::string& lexeme,
-                                 const std::string& comparator) -> int {
+inline auto handle_deterministic(std::string_view lexeme,
+                                 std::string_view comparator) -> int {
   if (lexeme.size() > comparator.size()) {
     return -1;
   }
@@ -157,8 +157,8 @@ struct LiteralResult {
   std::string error_message;
 };
 
-inline auto handle_literal(const std::string& lexeme,
-                           const std::string& comparator,
+inline auto handle_literal(std::string_view lexeme,
+                           std::string_view comparator,
                            TokenType completed_type,
                            const std::string& utf8_codepoint,
                            std::size_t line_num, std::size_t char_num)
@@ -183,11 +183,11 @@ inline auto handle_literal(const std::string& lexeme,
   return std::nullopt;
 }
 
-inline auto handle_literal_state(State current, const std::string& lexeme,
+inline auto handle_literal_state(State current, std::string_view lexeme,
                                  const std::string& utf8_codepoint,
                                  std::size_t line_num, std::size_t char_num)
     -> std::optional<LiteralResult> {
-  auto comparator = std::string{};
+  auto comparator = std::string_view{};
   auto completed_type = TokenType::END_OF_INPUT;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"
@@ -501,7 +501,7 @@ struct StateStepResult {
 
 auto process_state_step(State current_state, char32_t codepoint,
                         const std::string& utf8_codepoint,
-                        const std::string& lexeme, std::size_t line_number,
+                        std::string_view lexeme, std::size_t line_number,
                         std::size_t character_number) -> StateStepResult {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wswitch-enum"
@@ -580,52 +580,72 @@ inline auto is_number_state(State state) noexcept -> bool {
 
 }  // namespace detail
 
+void Tokenizer::update_position(char32_t codepoint) {
+  if (codepoint == detail::JSON_LINE_FEED) {
+    line_number++;
+    character_number = 1;
+  } else {
+    character_number++;
+  }
+}
+
 auto Tokenizer::next_token() -> Token {
   auto current_state = detail::State::START;
-  std::string lexeme;
   TokenType token_type = TokenType::END_OF_INPUT;
   std::string error_message;
+
+  std::size_t token_start_offset = 0;
+  bool token_started = false;
+
+  // Create a view over the entire file to avoid unsafe pointer arithmetic later
+  std::string_view full_file_view(file->data(), file->size());
+
   while (!file->at_end() && !detail::is_done(current_state)) {
+    const auto current_pos = file->current_offset();
     auto codepoint = file->next_codepoint();
     if (!codepoint) {
-      return Token{.lexeme = lexeme,
-                   .line_number = line_number,
-                   .character_number = character_number,
-                   .type = token_type};
+      break;
     }
 
     if (current_state == detail::State::START &&
         detail::is_insignificant_whitespace(*codepoint)) {
-      if (*codepoint == detail::JSON_LINE_FEED ||
-          *codepoint == detail::JSON_CARRIAGE_RETURN) {
-        line_number++;
-        character_number = 1;
-      } else {
-        character_number++;
-      }
+      update_position(*codepoint);
       continue;
     }
 
-    const auto utf8_codepoint = file_handler::codepoint_to_utf8(*codepoint);
-    lexeme += utf8_codepoint;
-    if (utf8_codepoint == "\n") {
-      line_number++;
-      character_number = 1;
-    } else {
-      character_number++;
+    if (!token_started) {
+      token_start_offset = current_pos;
+      token_started = true;
     }
 
+    update_position(*codepoint);
+
+    // Zero-copy: view from start of token to current position
+    // safe buffer usage: using substr on string_view is bounds-checked
+    std::string_view current_lexeme = full_file_view.substr(
+        token_start_offset, file->current_offset() - token_start_offset);
+
+    const auto utf8_codepoint = file_handler::codepoint_to_utf8(*codepoint);
     auto result =
         detail::process_state_step(current_state, *codepoint, utf8_codepoint,
-                                   lexeme, line_number, character_number);
+                                   current_lexeme, line_number, character_number);
     current_state = result.next_state;
     token_type = result.token_type;
     if (!result.error_message.empty()) {
       error_message = std::move(result.error_message);
     }
     if (result.put_back) {
-      file->put_back(*codepoint);
-      lexeme.pop_back();
+      file->revert();
+    }
+  }
+
+  // Construct the final lexeme view
+  std::string_view final_lexeme;
+  if (token_started) {
+    const std::size_t current_offset = file->current_offset();
+    if (current_offset >= token_start_offset) {
+      final_lexeme = full_file_view.substr(
+          token_start_offset, current_offset - token_start_offset);
     }
   }
 
@@ -637,7 +657,7 @@ auto Tokenizer::next_token() -> Token {
     if (!error_message.empty()) {
       std::cerr << error_message << '\n';
     }
-    return Token{.lexeme = error_message,
+    return Token{.lexeme = final_lexeme,
                  .line_number = line_number,
                  .character_number = character_number,
                  .type = TokenType::TK_ERROR};
@@ -647,7 +667,7 @@ auto Tokenizer::next_token() -> Token {
     token_type = TokenType::TK_NUMBER;
   }
 
-  return Token{.lexeme = lexeme,
+  return Token{.lexeme = final_lexeme,
                .line_number = line_number,
                .character_number = character_number,
                .type = token_type};

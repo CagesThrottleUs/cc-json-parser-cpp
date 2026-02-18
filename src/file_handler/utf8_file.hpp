@@ -53,8 +53,18 @@ class utf8_file {
   /**
    * Puts a codepoint back so the next read returns it.
    * @param codepoint The codepoint to put back.
+   * @deprecated Use revert() instead for performance.
    */
+  [[deprecated("Use revert() instead for performance.")]]
   virtual void put_back(codepoint_type codepoint) = 0;
+
+  /**
+   * Reverts the file pointer by one codepoint.
+   * This is a faster, non-throwing alternative to put_back that assumes
+   * the previous position contains valid UTF-8 (which it should, as we just read it).
+   */
+  virtual void revert() = 0;
+
 
   /**
    * Resets the file pointer to the beginning of the file.
@@ -80,6 +90,17 @@ class utf8_file {
    * Returns true if the file pointer is at the end of the file.
    */
   [[nodiscard]] virtual auto at_end() const noexcept -> bool = 0;
+
+  /**
+   * Returns a pointer to the start of the underlying data buffer.
+   * This is necessary for zero-copy tokenization (creating string_views).
+   */
+  [[nodiscard]] virtual auto data() const noexcept -> const char* = 0;
+
+  /**
+   * Returns the current byte offset in the file.
+   */
+  [[nodiscard]] virtual auto current_offset() const noexcept -> std::size_t = 0;
 };
 
 /**
