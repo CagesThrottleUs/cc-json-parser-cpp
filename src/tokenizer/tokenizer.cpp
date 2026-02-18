@@ -13,11 +13,12 @@ namespace tokenizer {
 
 namespace detail {
 
-/** JSON insignificant whitespace code points (U+0009, U+000A, U+000D, U+0020). */
-constexpr char32_t kJsonTab = 0x0009;
-constexpr char32_t kJsonLineFeed = 0x000A;
-constexpr char32_t kJsonCarriageReturn = 0x000D;
-constexpr char32_t kJsonSpace = 0x0020;
+/** JSON insignificant whitespace code points (U+0009, U+000A, U+000D, U+0020).
+ */
+constexpr char32_t JSON_TAB = 0x0009;
+constexpr char32_t JSON_LINE_FEED = 0x000A;
+constexpr char32_t JSON_CARRIAGE_RETURN = 0x000D;
+constexpr char32_t JSON_SPACE = 0x0020;
 
 /** Bundles line/column to avoid easily-swappable parameters. */
 struct Position {
@@ -62,16 +63,16 @@ inline auto is_hex_digit(const std::string& utf8_codepoint) noexcept -> bool {
 }
 
 /** JSON disallows unescaped control characters U+0000..U+001F in strings. */
-constexpr char32_t kJsonMaxUnescapedControl = 0x001F;
+constexpr char32_t JSON_MAX_UNESPACED_CONTROL = 0x001F;
 
 inline auto is_control_char(char32_t codepoint) noexcept -> bool {
-  return codepoint <= kJsonMaxUnescapedControl;
+  return codepoint <= JSON_MAX_UNESPACED_CONTROL;
 }
 
 /** Insignificant whitespace: tab, LF, CR, space. */
 inline auto is_insignificant_whitespace(char32_t codepoint) noexcept -> bool {
-  return codepoint == kJsonTab || codepoint == kJsonLineFeed ||
-         codepoint == kJsonCarriageReturn || codepoint == kJsonSpace;
+  return codepoint == JSON_TAB || codepoint == JSON_LINE_FEED ||
+         codepoint == JSON_CARRIAGE_RETURN || codepoint == JSON_SPACE;
 }
 
 inline auto format_error(const std::string& prefix, std::size_t line,
