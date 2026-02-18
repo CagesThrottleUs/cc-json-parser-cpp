@@ -16,18 +16,18 @@ constexpr std::size_t MAX_MAPPED_FILE_SIZE = 100ULL * 1024ULL * 1024ULL;
 /**
  * Abstract UTF-8 file: sequence of code points with peek, advance, next.
  */
-class Utf8File {
+class utf8_file {
  public:
   using codepoint_type = char32_t;
 
-  virtual ~Utf8File() = default;
-  Utf8File(const Utf8File&) = delete;
-  auto operator=(const Utf8File&) -> Utf8File& = delete;
-  Utf8File(Utf8File&&) = delete;
-  auto operator=(Utf8File&&) -> Utf8File& = delete;
+  virtual ~utf8_file() = default;
+  utf8_file(const utf8_file&) = delete;
+  auto operator=(const utf8_file&) -> utf8_file& = delete;
+  utf8_file(utf8_file&&) = delete;
+  auto operator=(utf8_file&&) -> utf8_file& = delete;
 
  protected:
-  Utf8File() = default;
+  utf8_file() = default;
 
  public:
   /**
@@ -93,7 +93,7 @@ auto get_file_load_type(const std::string& filename)
  * Opens the file with the appropriate implementation: full memory if
  * size < MAX_MAPPED_FILE_SIZE, else memory-mapped.
  */
-auto open_utf8_file(const std::string& filename) -> std::unique_ptr<Utf8File>;
+auto open_utf8_file(const std::string& filename) -> std::unique_ptr<utf8_file>;
 
 auto codepoint_to_utf8(char32_t codepoint) -> std::string;
 
